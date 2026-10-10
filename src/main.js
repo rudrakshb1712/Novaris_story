@@ -1,12 +1,13 @@
 import Lenis from 'lenis';
 import './style.css';
-import { U, CHAPTERS, GATES, OPTIONALS, HEADERS, BEATS, FINALE, chapterAt, meter, reserveAt, countdownAt } from './timeline.js';
-import { inv, clamp, win } from './util.js';
+import { U, CHAPTERS, GATES, OPTIONALS, chapterAt } from './timeline.js';
+import { clamp, win } from './util.js';
 import { createRenderer } from './render.js';
 import { createAudio } from './audio.js';
 import { createInteractions } from './interactions.js';
 import { createIronManCursor } from './ironman-cursor.js';
 import { createSpeechClouds } from './speech-clouds.js';
+import { STORY_BEATS } from './story-beats.js';
 
 // ---------- reload always starts at the top ----------
 if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
@@ -30,7 +31,11 @@ let audio = null;
 let muted = true;
 let started = false;
 
-// ---------- scrolling ----------
+// ---------- discrete beat controller state ----------
+let currentBeatIndex = 0;
+let targetU = STORY_BEATS[0]?.u || 2.8;
+
+// Keep track of layout for canvas/checkpoints
 let unitPx = window.innerHeight * 0.85;
 function limitU() {
   for (const g of GATES) if (!S.done[g.id]) return g.u;
@@ -38,42 +43,45 @@ function limitU() {
 }
 function layoutTrack() {
   unitPx = Math.max(360, window.innerHeight * 0.85);
-  // the page physically ends at the next unfinished checkpoint: no input method can pass it
   track.style.height = Math.ceil(window.innerHeight + limitU() * unitPx) + 'px';
 }
 layoutTrack();
 
+// Lenis instance kept in sync for coordinates
 const lenis = new Lenis({
   autoRaf: false,
   lerp: S.reduced ? 1 : 0.1,
-  smoothWheel: !S.reduced,
-  wheelMultiplier: 0.9,
-  touchMultiplier: 1.2,
+  smoothWheel: false, // Disabled continuous dragging in favor of discrete beats
 });
 lenis.stop();
 document.body.classList.add('locked');
 
 function scrollToU(u, immediate) {
-  const y = clamp(u, 0, limitU()) * unitPx;
-  lenis.scrollTo(y, { immediate: !!immediate || S.reduced, force: true, duration: immediate ? 0 : 1.6 });
+  targetU = clamp(u, 0, limitU());
+  if (immediate || S.reduced) S.u = targetU;
+  const y = targetU * unitPx;
+  lenis.scrollTo(y, { immediate: true, force: true });
 }
 
-// ---------- checkpoints ----------
+// ---------- interactive checkpoints ----------
 const inter = createInteractions(S, R, {
   sound: (n, a) => audio && audio.play(n, a),
   complete(id) {
     if (S.done[id]) return;
     S.done[id] = true;
     layoutTrack();
-    lenis.resize();
     inter.showOk(id);
+    // After gate completion, seamlessly advance to the next beat
+    setTimeout(() => {
+      if (started) advanceBeat();
+    }, 750);
   },
 });
 
 function activeGate() {
   for (const g of GATES) {
     if (S.done[g.id]) continue;
-    if (S.u >= g.u - 0.12) return g.id;
+    if (S.u >= g.u - 0.15) return g.id;
     return null;
   }
   return null;
@@ -83,147 +91,280 @@ function activeOptional() {
   return null;
 }
 
-// a forward push while stopped at a checkpoint nudges the prompt
+// Nudge prompt if trying to advance past an incomplete gate
 let lastNudge = 0;
 function blockedForward() {
-  if (!S.gateActive) return;
   const now = performance.now();
-  if (now - lastNudge > 700) { lastNudge = now; inter.nudge(); }
+  if (now - lastNudge > 600) {
+    lastNudge = now;
+    inter.nudge();
+  }
 }
-window.addEventListener('wheel', (e) => { if (e.deltaY > 0) blockedForward(); }, { passive: true });
-let touchY = null;
-window.addEventListener('touchstart', (e) => { touchY = e.touches[0].clientY; }, { passive: true });
-window.addEventListener('touchmove', (e) => { if (touchY != null && touchY - e.touches[0].clientY > 12) blockedForward(); }, { passive: true });
-window.addEventListener('keydown', (e) => {
-  if (!started) return;
-  const fwd = ['ArrowDown', 'PageDown', 'End'].includes(e.key) || (e.key === ' ' && !(e.target instanceof HTMLButtonElement));
-  if (fwd) blockedForward();
-});
 
-// ---------- story text ----------
+// ---------- UI Elements ----------
 const card = $('card');
 const hdr = $('header'), hNum = $('hNum'), hTitle = $('hTitle'), hSub = $('hSub');
 const fin = $('finale'), fText = $('fText');
-const WHO = { ASHA: 'asha', AARAV: 'aarav', MEERA: 'meera', TONY: 'tony', IRONMAN: 'tony', BRUCE: 'bruce', THOR: 'thor', FRIDAY: 'friday', 'THE VOICE': 'engine', 'THE THIRST ENGINE': 'engine' };
-const AVATARS = {
-  TONY: '/assets/avengers/iron%20man.png?v=2',
-  IRONMAN: '/assets/avengers/iron%20man.png?v=2',
-  BRUCE: '/assets/avengers/bruce(hulk).png?v=2',
-  THOR: '/assets/avengers/thor.png?v=2',
-};
-const lineHtml = ([who, text]) => {
-  const av = AVATARS[who] ? `<img class="who-avatar" src="${AVATARS[who]}" alt="${who}" />` : '';
-  return `<div class="line"><span class="who ${WHO[who] || 'other'}">${av}${who}</span><span class="says">${text}</span></div>`;
-};
-function beatHtml(b) {
-  if (b.kind === 'prose') return b.html.replace(/\b(\d{1,2}:\d{2}\s*(?:a\.m\.|p\.m\.)?)/gi, '<span class="timestamp">$1</span>');
-  if (b.kind === 'line') return b.lines.map(lineHtml).join('');
-  if (b.kind === 'sys') return `<div class="sys-head">${b.head}</div>${b.html ? `<div>${b.html}</div>` : ''}${b.after ? `<div style="margin-top:${b.html ? 10 : 0}px">${lineHtml(b.after)}</div>` : ''}`;
-  if (b.kind === 'list') return `<p><strong>${b.head}</strong></p><ul>${b.items.map(([a, d]) => `<li><b>${a}</b> ${d}</li>`).join('')}</ul>`;
-  return '';
-}
-function endOf(list, i) { return list[i].end ?? (list[i + 1] ? list[i + 1].u : U); }
-function pick(list, u) {
-  for (let i = list.length - 1; i >= 0; i--) {
-    if (u >= list[i].u) return u < endOf(list, i) ? { b: list[i], i, end: endOf(list, i) } : null;
-  }
-  return null;
-}
-let cardH = 0;
-let shownBeat = null, shownHeader = null, shownFinale = null;
-function updateText() {
-  const u = S.u;
-  // story card
-  const p = pick(BEATS, u);
-  let op = 0;
-  if (p) {
-    op = Math.min(inv(p.b.u, p.b.u + 0.14, u), 1 - inv(p.end - 0.1, p.end, u));
-    const isPureDialogue = p.b.kind === 'line';
-    if (isPureDialogue) {
-      // Character dialogue is displayed directly as animated comic speech clouds over characters' heads
-      card.hidden = true;
-      card.style.opacity = '0';
-      shownBeat = p.b;
-    } else {
-      if (shownBeat !== p.b) {
-        shownBeat = p.b;
-        card.className = p.b.kind === 'sys' ? 'sys' : '';
-        card.innerHTML = beatHtml(p.b);
-        card.hidden = false;
-        cardH = card.offsetHeight;
-      }
-      // on short screens, a waiting checkpoint prompt takes priority over the story card
-      const pr = $('prompt');
-      if (op > 0.01 && !pr.hidden && pr.offsetHeight + cardH + 12 > (window.innerWidth <= 720 ? window.innerHeight * 0.56 : window.innerHeight - 130)) op = 0;
-      card.hidden = op <= 0.01;
-      card.style.opacity = op.toFixed(3);
-      card.style.transform = `translateY(${((1 - op) * 10).toFixed(1)}px)`;
-    }
-  } else {
-    card.hidden = true;
-    card.style.opacity = '0';
-  }
-  // chapter header
-  let ho = 0;
-  for (const h of HEADERS) {
-    if ((u >= h.u - 0.2 || h.title0) && u < h.end) {
-      ho = Math.min(inv(h.u - 0.2, h.u + 0.1, u), 1 - inv(h.end - 0.2, h.end, u));
-      if (h.title0) ho = 1 - inv(h.end - 0.2, h.end, u); // title card is up from the first frame
-      if (shownHeader !== h) { shownHeader = h; hNum.textContent = h.num; hTitle.textContent = h.title; hSub.textContent = h.sub; }
-      break;
-    }
-  }
-  hdr.style.opacity = ho.toFixed(3);
-  hdr.style.visibility = ho > 0.01 ? 'visible' : 'hidden';
-  // finale
-  let fo = 0;
-  for (const f of FINALE) {
-    if (u >= f.u && u < f.end) {
-      fo = Math.min(inv(f.u, f.u + 0.2, u), 1 - inv(f.end - 0.15, f.end, u));
-      if (shownFinale !== f) { shownFinale = f; fText.textContent = f.text; fin.classList.toggle('show-extra', !!f.extra); }
-      break;
-    }
-  }
-  fin.style.opacity = fo.toFixed(3);
-  fin.style.visibility = fo > 0.01 ? 'visible' : 'hidden';
-  S.hideLabels = fo > 0.05;
-}
-
-// ---------- live meter ----------
 const mChip = $('mChip'), mChipText = $('mChipText'), mRes = $('mRes'), mResV = $('mResV'), mSup = $('mSup'), mSupV = $('mSupV');
 const mExtra = $('mExtra'), mExtraK = $('mExtraK'), mExtraV = $('mExtraV'), meterEl = $('meter');
-let chipState = '';
-let lastSup = 30;
-function updateMeter() {
-  const u = S.u;
-  const [res, sup] = meter(u);
-  mRes.style.width = res + '%'; mResV.textContent = Math.round(res) + '%';
-  mSup.style.width = sup + '%'; mSupV.textContent = Math.round(sup) + '%';
-  if (lastSup > 0.5 && sup <= 0.5) { meterEl.classList.remove('shake'); void meterEl.offsetWidth; meterEl.classList.add('shake'); }
-  lastSup = sup;
-  // the official chip lies until the very end
-  let st = 'normal';
-  if (S.done.sever && u > 36.95) st = u < 37.8 ? 'offline' : u < 50.9 ? 'local' : 'honest';
-  else if (u > 50.9) st = 'honest';
-  if (st !== chipState) {
-    chipState = st;
-    mChip.className = 'm-chip' + (st === 'normal' ? '' : ' ' + st);
-    mChipText.textContent = { normal: 'NORMAL', offline: 'OFFLINE', local: 'LOCAL CONTROL', honest: 'LIMITED SUPPLY' }[st];
+const navTicks = $('navTicks'), navFill = $('navFill'), mastChapter = $('mastChapter');
+
+// Visual Novel footer controls
+const vnControls = $('vnControls');
+const vnPrev = $('vnPrev');
+const vnNext = $('vnNext');
+const vnBeatCurrent = $('vnBeatCurrent');
+const vnBeatTotal = $('vnBeatTotal');
+const vnHint = $('vnHint');
+
+if (vnBeatTotal) vnBeatTotal.textContent = String(STORY_BEATS.length);
+
+// ---------- discrete beat transitions ----------
+let headerTimer = null;
+let shownChapterNum = -1;
+
+function updateBeatUI(beat) {
+  if (vnBeatCurrent) vnBeatCurrent.textContent = String(currentBeatIndex + 1);
+  if (vnPrev) vnPrev.disabled = currentBeatIndex === 0;
+  if (vnNext) vnNext.disabled = currentBeatIndex === STORY_BEATS.length - 1;
+
+  if (vnHint) {
+    if (beat.gate && !S.done[beat.gate]) {
+      vnHint.textContent = 'Interaction required to proceed ⚡';
+      vnHint.style.color = '#ff8000';
+    } else if (beat.isFinale) {
+      vnHint.textContent = 'Story complete · Protocol concluded';
+      vnHint.style.color = '#00e5ff';
+    } else {
+      vnHint.textContent = 'Tap screen or Space to advance ▶';
+      vnHint.style.color = '#8b949e';
+    }
   }
-  const cd = countdownAt(u);
-  const rv = reserveAt(u);
-  let k = null, v = '', alarm = false;
-  if (cd != null && u > 32.3 && u < 37.4) { k = 'SHUTDOWN'; v = '00:' + String(Math.max(2, Math.ceil(cd))).padStart(2, '0'); alarm = true; }
-  else if (rv != null) { k = 'RESERVE'; const s = Math.round(rv * 3600); v = `${Math.floor(s / 3600)}h ${String(Math.floor(s / 60) % 60).padStart(2, '0')}m left`; alarm = rv < 1.5; }
-  else if (u >= 38.6 && u < 42.2) { k = 'TANKERS'; v = 'EN ROUTE · 6 LANES'; }
-  else if (u >= 42.8) { k = 'OVERSIGHT'; v = 'PUBLIC DATA · WEEKLY'; }
-  mExtra.classList.toggle('hide', !k);
-  mExtra.classList.toggle('alarm', alarm);
-  if (k) { mExtraK.textContent = k; mExtraV.textContent = v; }
 }
 
-// ---------- navigation ----------
-const navTicks = $('navTicks'), navFill = $('navFill'), mastChapter = $('mastChapter');
+function applyBeatHud(hud) {
+  if (!hud) return;
+  if (hud.suryasagar != null) {
+    mRes.style.width = hud.suryasagar + '%';
+    mResV.textContent = Math.round(hud.suryasagar) + '%';
+  }
+  if (hud.shantinagar != null) {
+    mSup.style.width = hud.shantinagar + '%';
+    mSupV.textContent = Math.round(hud.shantinagar) + '%';
+  }
+  if (hud.status) {
+    mChipText.textContent = hud.status;
+    const st = hud.status.toLowerCase();
+    let chipClass = 'm-chip';
+    if (st.includes('bypass') || st.includes('alert') || st.includes('toxic') || st.includes('critical') || st.includes('failure')) {
+      chipClass += ' alert';
+    } else if (st.includes('shutdown') || st.includes('offline')) {
+      chipClass += ' offline';
+    } else if (st.includes('honest') || st.includes('sustainable') || st.includes('restored') || st.includes('complete') || st.includes('peace')) {
+      chipClass += ' honest';
+    } else if (st.includes('local')) {
+      chipClass += ' local';
+    }
+    mChip.className = chipClass;
+  }
+}
+
+function applyBeatText(beat) {
+  if (!beat) return;
+
+  // Chapter Header banner on chapter change
+  if (beat.chapter !== shownChapterNum && beat.chapter > 0) {
+    shownChapterNum = beat.chapter;
+    hNum.textContent = `CHAPTER ${String(beat.chapter).padStart(2, '0')}`;
+    hTitle.textContent = beat.chapterTitle || `Chapter ${beat.chapter}`;
+    hSub.textContent = beat.text.length < 50 ? beat.text : '';
+    hdr.style.opacity = '1';
+    hdr.style.visibility = 'visible';
+
+    clearTimeout(headerTimer);
+    headerTimer = setTimeout(() => {
+      hdr.style.opacity = '0';
+      setTimeout(() => { hdr.style.visibility = 'hidden'; }, 450);
+    }, 2400);
+  }
+
+  // Finale screen
+  if (beat.isFinale) {
+    card.hidden = true;
+    card.style.opacity = '0';
+    speechClouds.hide();
+    fin.style.opacity = '1';
+    fin.style.visibility = 'visible';
+    fText.textContent = beat.text;
+    fin.classList.add('show-extra');
+    S.hideLabels = true;
+    return;
+  } else {
+    fin.style.opacity = '0';
+    fin.style.visibility = 'hidden';
+    fin.classList.remove('show-extra');
+    S.hideLabels = false;
+  }
+
+  // Comic speech cloud vs narrative card
+  const speaker = (beat.speaker || 'narrator').toLowerCase().trim();
+  if (speaker === 'narrator') {
+    speechClouds.hide();
+    card.hidden = false;
+    card.className = '';
+    const formattedText = beat.text.replace(/\b(\d{1,2}:\d{2}\s*(?:a\.m\.|p\.m\.)?)/gi, '<span class="timestamp">$1</span>');
+    card.innerHTML = `<p>${formattedText}</p>`;
+    card.style.opacity = '1';
+    card.style.transform = 'translateY(0)';
+  } else {
+    // Character dialogue emerges as comic speech cloud above their head
+    card.hidden = true;
+    card.style.opacity = '0';
+    speechClouds.show(speaker, beat.text, beat.u);
+  }
+}
+
+let navChapter = -1;
+function updateNavForBeat(beat) {
+  const f = clamp(beat.u / U) * 100;
+  const mobile = window.innerWidth <= 720;
+  navFill.style.height = mobile ? '100%' : f + '%';
+  navFill.style.width = mobile ? f + '%' : '100%';
+  const chNum = beat.chapter;
+  if (chNum !== navChapter) {
+    navChapter = chNum;
+    const ch = CHAPTERS.find((c) => c.n === chNum) || { n: chNum, name: beat.chapterTitle || '' };
+    mastChapter.textContent = ch.n ? `${String(ch.n).padStart(2, '0')} · ${ch.name}` : 'Novaris';
+    for (const t of tickEls) {
+      t.b.classList.toggle('past', t.ch.n < ch.n);
+      t.b.classList.toggle('here', t.ch.n === ch.n);
+    }
+  }
+}
+
+export function jumpToBeat(index, immediate = false) {
+  currentBeatIndex = clamp(index, 0, STORY_BEATS.length - 1);
+  const beat = STORY_BEATS[currentBeatIndex];
+  if (!beat) return;
+
+  targetU = beat.u;
+  if (immediate || S.reduced) {
+    S.u = targetU;
+  }
+
+  updateBeatUI(beat);
+  applyBeatHud(beat.hudState || beat.hud);
+  updateNavForBeat(beat);
+  applyBeatText(beat);
+
+  if (audio) {
+    audio.setChapter(beat.chapter, beat.u);
+  }
+}
+
+export function advanceBeat() {
+  if (!started) return;
+  const curBeat = STORY_BEATS[currentBeatIndex];
+  if (curBeat && curBeat.gate && !S.done[curBeat.gate]) {
+    blockedForward();
+    return;
+  }
+  if (currentBeatIndex < STORY_BEATS.length - 1) {
+    jumpToBeat(currentBeatIndex + 1);
+  }
+}
+
+export function rewindBeat() {
+  if (!started) return;
+  if (currentBeatIndex > 0) {
+    jumpToBeat(currentBeatIndex - 1);
+  }
+}
+
+// ---------- Input Triggers ----------
+
+// 1. Click/Tap anywhere on main story screen
+window.addEventListener('click', (e) => {
+  if (!started) return;
+  if (e.target.closest('button, input, a, select, textarea, #prompt, .gate-interactive, #mute, .tick, #entry, #replay, .vn-btn')) {
+    return;
+  }
+  advanceBeat();
+});
+
+// 2. Keyboard Navigation
+window.addEventListener('keydown', (e) => {
+  if (!started) return;
+  if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
+  if (['Space', ' ', 'ArrowRight', 'Enter', 'PageDown'].includes(e.key)) {
+    e.preventDefault();
+    advanceBeat();
+  } else if (['ArrowLeft', 'PageUp'].includes(e.key)) {
+    e.preventDefault();
+    rewindBeat();
+  }
+});
+
+// 3. Mouse Wheel / Trackpad (Debounced 350ms, single flick advances ONE beat)
+let lastWheelAdvance = 0;
+window.addEventListener('wheel', (e) => {
+  if (!started) return;
+  e.preventDefault();
+  const now = performance.now();
+  if (now - lastWheelAdvance < 350) return;
+
+  const dy = e.deltaY;
+  const dx = e.deltaX;
+  if (Math.abs(dy) > 14 || Math.abs(dx) > 14) {
+    lastWheelAdvance = now;
+    if (dy > 0 || dx > 0) {
+      advanceBeat();
+    } else {
+      rewindBeat();
+    }
+  }
+}, { passive: false });
+
+// 4. Touch Gestures (Swipe left/tap advances, swipe right rewinds)
+let touchStartX = null, touchStartY = null, touchStartTime = 0;
+window.addEventListener('touchstart', (e) => {
+  if (!started) return;
+  const t = e.touches[0];
+  touchStartX = t.clientX;
+  touchStartY = t.clientY;
+  touchStartTime = performance.now();
+}, { passive: true });
+
+window.addEventListener('touchend', (e) => {
+  if (!started || touchStartX == null) return;
+  if (e.target.closest('button, input, a, select, textarea, #prompt, .gate-interactive, #mute, .tick, #entry, #replay, .vn-btn')) {
+    touchStartX = null;
+    return;
+  }
+  const t = e.changedTouches[0];
+  const dx = t.clientX - touchStartX;
+  const dy = t.clientY - touchStartY;
+  const dt = performance.now() - touchStartTime;
+  touchStartX = null;
+  touchStartY = null;
+
+  if (Math.abs(dx) > 36 && Math.abs(dx) > Math.abs(dy)) {
+    if (dx < 0) {
+      advanceBeat(); // swipe left
+    } else {
+      rewindBeat();  // swipe right
+    }
+  } else if (dt < 300 && Math.abs(dx) < 15 && Math.abs(dy) < 15) {
+    advanceBeat();   // tap on story
+  }
+}, { passive: true });
+
+// 5. VN Controller Buttons
+if (vnPrev) vnPrev.addEventListener('click', (e) => { e.stopPropagation(); rewindBeat(); });
+if (vnNext) vnNext.addEventListener('click', (e) => { e.stopPropagation(); advanceBeat(); });
+
+// ---------- Chapter Navigation ticks ----------
 const tickEls = [];
 for (const ch of CHAPTERS.slice(1)) {
   const li = document.createElement('li');
@@ -231,14 +372,17 @@ for (const ch of CHAPTERS.slice(1)) {
   b.className = 'tick'; b.type = 'button';
   b.setAttribute('aria-label', `Chapter ${ch.n}: ${ch.name}`);
   b.innerHTML = `<span class="tick-label">${ch.n} · ${ch.name}</span>`;
-  b.addEventListener('click', () => {
-    const lim = limitU();
-    if (ch.u > lim) blockedForward();
-    scrollToU(Math.min(ch.u + 0.02, lim));
+  b.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const targetIndex = STORY_BEATS.findIndex((bt) => bt.chapter === ch.n);
+    if (targetIndex !== -1) {
+      jumpToBeat(targetIndex);
+    }
   });
   li.append(b); navTicks.append(li);
   tickEls.push({ li, b, ch });
 }
+
 function layoutNav() {
   const mobile = window.innerWidth <= 720;
   for (const t of tickEls) {
@@ -252,22 +396,8 @@ function layoutNav() {
     document.documentElement.style.setProperty('--mute-top', Math.round(r.bottom + 34) + 'px');
   }
 }
-let navChapter = -1;
-function updateNav() {
-  const f = clamp(S.u / U) * 100;
-  const mobile = window.innerWidth <= 720;
-  navFill.style.height = mobile ? '100%' : f + '%';
-  navFill.style.width = mobile ? f + '%' : '100%';
-  const ch = chapterAt(S.u);
-  if (ch.n !== navChapter) {
-    navChapter = ch.n;
-    mastChapter.textContent = ch.n ? `${String(ch.n).padStart(2, '0')} · ${ch.name}` : 'Novaris';
-    for (const t of tickEls) { t.b.classList.toggle('past', t.ch.n < ch.n); t.b.classList.toggle('here', t.ch.n === ch.n); }
-    if (audio) audio.setChapter(ch.n, S.u);
-  }
-}
 
-// ---------- sound cues (forward only) ----------
+// ---------- Sound cues (forward only) ----------
 const CUES = [
   [19.6, 'glitch'], [20.3, 'denied'], [21.0, 'jet'], [24.2, 'denied'], [26.7, 'glitch'], [27.45, 'rupture'],
   [28.8, 'hum'], [30.85, 'hum'], [38.7, 'pour'], [41.15, 'pour'], [51.6, 'jet'], [52.6, 'final'],
@@ -287,7 +417,7 @@ let avoidTick = 0;
 function updateAvoid() {
   if (avoidTick++ % 5) return;
   const out = [];
-  for (const id of ['card', 'prompt', 'meter', 'mute']) {
+  for (const id of ['card', 'prompt', 'meter', 'mute', 'vnControls']) {
     const e = $(id);
     if (!e || e.hidden) continue;
     const r = e.getBoundingClientRect();
@@ -309,7 +439,7 @@ function adapt(dt) {
   else if (avg < 0.015 && S.rs < 1) { S.rs = Math.min(1, S.rs + 0.1); R.resize(); perfCool = 4; }
 }
 
-// ---------- main loop: one bad frame never stops it ----------
+// ---------- main loop: Smooth Camera Interpolation ----------
 let last = performance.now();
 let errCount = 0;
 let stepping = false;
@@ -319,29 +449,27 @@ function frame(now) {
   last = now;
   S.dt = dt; S.t += dt;
   try {
-    lenis.raf(now);
-    S.uT = clamp(lenis.scroll / unitPx, 0, limitU());
-    // eased story progress: big jumps still play out as motion
-    const k = S.reduced ? 18 : 4.2;
-    S.u += (S.uT - S.u) * (1 - Math.exp(-dt * k));
-    if (Math.abs(S.uT - S.u) < 0.0004 || S.snap) S.u = S.uT;
+    // Smooth camera pan toward targetU
+    const k = S.reduced ? 18 : 6.0;
+    S.u += (targetU - S.u) * (1 - Math.exp(-dt * k));
+    if (Math.abs(targetU - S.u) < 0.0004) S.u = targetU;
+
     S.gateActive = activeGate();
     inter.update(S.gateActive || activeOptional(), dt);
-    updateText();
-    updateMeter();
-    updateNav();
+
+    // Keep active comic speech clouds anchored directly over character heads as camera pans
+    speechClouds.sync(S.u);
+
     updateSound();
     updateAvoid();
     R.draw();
-    const curBeatInfo = pick(BEATS, S.u);
-    speechClouds.update(S.u, curBeatInfo ? curBeatInfo.b : null, curBeatInfo ? curBeatInfo.end : null);
     adapt(dt);
   } catch (e) {
     if (errCount++ < 5) console.error('[frame]', e);
   }
 }
 
-// ---------- entry ----------
+// ---------- entry and audio management ----------
 let startAudioTriggered = false;
 function triggerStartAudio() {
   if (started || startAudioTriggered) return;
@@ -355,7 +483,7 @@ function triggerStartAudio() {
   }
 }
 
-// If user clicks anywhere on the start page before clicking Begin, start the soundtrack
+// If user clicks anywhere on start screen before clicking Begin, start the theme
 $('entry').addEventListener('pointerdown', (e) => {
   if (e.target && e.target.id === 'startQuiet') return;
   triggerStartAudio();
@@ -370,7 +498,7 @@ function begin(withSound) {
       muted = false;
       audio.setMuted(false);
       audio.playStart();
-      audio.setChapter(chapterAt(S.u).n, S.u);
+      audio.setChapter(STORY_BEATS[0].chapter, STORY_BEATS[0].u);
     }
   } else {
     if (audio) {
@@ -383,9 +511,11 @@ function begin(withSound) {
   $('entry').classList.add('gone');
   document.body.classList.add('started');
   document.body.classList.remove('locked');
-  lenis.start();
   setTimeout(() => { $('entry').style.display = 'none'; }, 950);
   layoutNav();
+
+  // Jump to first story beat
+  jumpToBeat(0, true);
 }
 $('startSound').addEventListener('click', () => begin(true));
 $('startQuiet').addEventListener('click', () => begin(false));
@@ -396,22 +526,19 @@ function syncMute() {
   $('muteText').textContent = muted ? 'Sound off' : 'Sound on';
 }
 $('mute').addEventListener('click', () => {
-  if (!audio) { audio = createAudio(); if (audio) audio.setChapter(chapterAt(S.u).n, S.u); }
+  if (!audio) { audio = createAudio(); if (audio) audio.setChapter(STORY_BEATS[currentBeatIndex]?.chapter || 1, S.u); }
   muted = !muted;
   if (audio) audio.setMuted(muted);
   syncMute();
 });
 
-$('replay').addEventListener('click', () => {
+$('replay').addEventListener('click', (e) => {
+  e.stopPropagation();
   S.done = {};
   S.cp = { local: Array(9).fill(false), evidence: [] };
   inter.reset();
   speechClouds.clear();
-  layoutTrack();
-  lenis.resize();
-  lenis.scrollTo(0, { immediate: true, force: true });
-  S.u = 0; S.uT = 0; prevU = 0;
-  window.scrollTo(0, 0);
+  jumpToBeat(0, true);
   if (audio && !muted) audio.resetStart();
 });
 
@@ -421,7 +548,7 @@ if (window.matchMedia('(pointer: fine)').matches) {
   createIronManCursor();
 }
 
-// ---------- repulsor flash on click (mouse only, skipped for reduced motion) ----------
+// ---------- repulsor flash on click ----------
 window.addEventListener('pointerdown', (e) => {
   if (e.pointerType !== 'mouse' || S.reduced) return;
   const z = document.createElement('div');
@@ -435,17 +562,15 @@ window.addEventListener('pointerdown', (e) => {
 // ---------- resize ----------
 let rzT = 0;
 function onResize() {
-  const keepU = S.uT;
-  shownBeat = null;
   R.resize();
   layoutTrack();
-  lenis.resize();
-  lenis.scrollTo(keepU * unitPx, { immediate: true, force: true });
   layoutNav();
+  if (started && STORY_BEATS[currentBeatIndex]) {
+    jumpToBeat(currentBeatIndex, true);
+  }
 }
 window.addEventListener('resize', () => { clearTimeout(rzT); rzT = setTimeout(onResize, 120); });
 reducedQ.addEventListener?.('change', (e) => { S.reduced = e.matches; });
-window.addEventListener('pageshow', (e) => { if (e.persisted) { lenis.scrollTo(0, { immediate: true, force: true }); S.u = S.uT = 0; } });
 
 R.resize();
 layoutNav();
@@ -454,6 +579,15 @@ requestAnimationFrame((t) => { last = t; frame(t); });
 setTimeout(() => document.body.classList.remove('booting'), 50);
 $('startSound').focus({ preventScroll: true });
 
-// test hook, dev server only
-if (import.meta.env.DEV) window.__story = { S, scrollToU, lenis, step: (n = 1, ms = 16.7) => { for (let i = 0; i < n; i++) { stepping = true; frame(last + ms); stepping = false; } }, complete: (id) => inter && (S.done[id] = true, layoutTrack(), lenis.resize()) };
-void win;
+// test hooks
+if (import.meta.env.DEV) {
+  window.__story = {
+    S,
+    STORY_BEATS,
+    advanceBeat,
+    rewindBeat,
+    jumpToBeat,
+    get currentBeatIndex() { return currentBeatIndex; },
+    complete: (id) => inter && (S.done[id] = true, inter.showOk(id)),
+  };
+}

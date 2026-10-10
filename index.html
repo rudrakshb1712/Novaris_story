@@ -74,6 +74,23 @@
     </div>
   </section>
 
+  <!-- Visual Novel / Interactive Comic Tap-to-Advance Controller -->
+  <aside id="vnControls" class="vn-controls" aria-label="Story advancement controls">
+    <button id="vnPrev" class="vn-btn vn-prev" aria-label="Rewind beat" title="Previous beat (Left Arrow)">
+      <span aria-hidden="true">◀</span>
+    </button>
+    <div id="vnIndicator" class="vn-indicator" role="status" aria-live="polite">
+      <div class="vn-beat-row">
+        <span class="vn-beat-tag">BEAT</span>
+        <span class="vn-beat-count"><b id="vnBeatCurrent">1</b><span class="vn-sep">/</span><span id="vnBeatTotal">57</span></span>
+      </div>
+      <span class="vn-hint" id="vnHint">Tap screen or Space to advance ▶</span>
+    </div>
+    <button id="vnNext" class="vn-btn vn-next" aria-label="Advance beat" title="Next beat (Space / Right Arrow / Enter)">
+      <span aria-hidden="true">▶</span>
+    </button>
+  </aside>
+
   <div id="dock">
     <div id="prompt" role="region" aria-label="Your move" aria-live="polite"></div>
     <article id="card" aria-live="polite"></article>
@@ -97,7 +114,7 @@
         <button class="btn btn-paper" id="startSound">Begin with sound</button>
         <button class="btn btn-ghost" id="startQuiet">Begin in silence</button>
       </div>
-      <p class="entry-note">Scroll to move through the story, and back to rewind. Some moments wait for your hand.</p>
+      <p class="entry-note">Tap anywhere, click, or press Space to advance through each comic beat. Some moments wait for your hand.</p>
       <p class="entry-legal">Fan story · Avengers characters &amp; trademarks belong to Marvel · not affiliated or endorsed</p>
     </div>
   </div>

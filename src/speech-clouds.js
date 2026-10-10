@@ -26,6 +26,14 @@ export const SPEAKERS = {
     avatar: '/assets/avengers/iron%20man.png?v=2',
     initials: 'TS',
   },
+  STARK: {
+    tag: 'STARK',
+    col: '#00B4D8',
+    bg: 'rgba(0, 180, 216, 0.12)',
+    border: 'rgba(0, 180, 216, 0.4)',
+    avatar: '/assets/avengers/iron%20man.png?v=2',
+    initials: 'TS',
+  },
   IRONMAN: {
     tag: 'STARK',
     col: '#00B4D8',
@@ -36,6 +44,14 @@ export const SPEAKERS = {
   },
   BRUCE: {
     tag: 'BRUCE',
+    col: '#16A34A',
+    bg: 'rgba(22, 163, 74, 0.12)',
+    border: 'rgba(22, 163, 74, 0.4)',
+    avatar: '/assets/avengers/bruce(hulk).png?v=2',
+    initials: 'BB',
+  },
+  BANNER: {
+    tag: 'BANNER',
     col: '#16A34A',
     bg: 'rgba(22, 163, 74, 0.12)',
     border: 'rgba(22, 163, 74, 0.4)',
@@ -109,6 +125,14 @@ export const SPEAKERS = {
     initials: 'TE',
     transmission: true,
   },
+  ENGINE: {
+    tag: 'THIRST ENGINE',
+    col: '#DC2626',
+    bg: 'rgba(220, 38, 38, 0.14)',
+    border: 'rgba(220, 38, 38, 0.45)',
+    initials: 'TE',
+    transmission: true,
+  },
 };
 
 export function createSpeechClouds(container, R, S) {
@@ -124,6 +148,8 @@ export function createSpeechClouds(container, R, S) {
   const activeClouds = new Map();
   let currentKey = '';
   let activeDialogue = null;
+  let activeSpeaker = null;
+  let activeText = null;
 
   function getSpeakerMeta(who) {
     const key = (who || '').toUpperCase().trim();
@@ -178,7 +204,7 @@ export function createSpeechClouds(container, R, S) {
       if (u >= 28 && u < 38) return [1115, 930];
       return [1032, -14];
     }
-    if (key === 'BRUCE') {
+    if (key === 'BRUCE' || key === 'BANNER') {
       if (u >= 15 && u < 21) return [112, 0];
       if (u >= 28 && u < 38) return [1222, 930];
       return [1068, -14];
@@ -354,6 +380,59 @@ export function createSpeechClouds(container, R, S) {
     positionCloud(cloudEl, who, isTransmission);
   }
 
+  function show(who, text, u) {
+    if (!who || !text || who.toLowerCase() === 'narrator') {
+      hide();
+      return;
+    }
+    const key = `${who}_${text}`;
+    if (currentKey === key && activeClouds.size > 0) {
+      sync(u);
+      return;
+    }
+    currentKey = key;
+    activeSpeaker = who;
+    activeText = text;
+
+    for (const [, el] of activeClouds) {
+      el.classList.add('fade-out');
+      setTimeout(() => {
+        if (el.parentNode) el.parentNode.removeChild(el);
+      }, 220);
+    }
+    activeClouds.clear();
+
+    const speakerMeta = getSpeakerMeta(who);
+    const isTransmission = !!speakerMeta.transmission;
+    const cloudEl = createCloudElement(who, text, isTransmission);
+    layer.appendChild(cloudEl);
+    activeClouds.set(key, cloudEl);
+
+    positionCloud(cloudEl, who, isTransmission);
+  }
+
+  function hide() {
+    currentKey = '';
+    activeSpeaker = null;
+    activeText = null;
+    for (const [, el] of activeClouds) {
+      el.classList.add('fade-out');
+      setTimeout(() => {
+        if (el.parentNode) el.parentNode.removeChild(el);
+      }, 220);
+    }
+    activeClouds.clear();
+  }
+
+  function sync(u) {
+    if (!activeSpeaker) return;
+    const cloudEl = activeClouds.get(currentKey);
+    if (cloudEl) {
+      const isTransmission = !!getSpeakerMeta(activeSpeaker).transmission;
+      positionCloud(cloudEl, activeSpeaker, isTransmission);
+    }
+  }
+
   function clear() {
     for (const [, el] of activeClouds) {
       if (el.parentNode) el.parentNode.removeChild(el);
@@ -361,11 +440,17 @@ export function createSpeechClouds(container, R, S) {
     activeClouds.clear();
     currentKey = '';
     activeDialogue = null;
+    activeSpeaker = null;
+    activeText = null;
   }
 
   return {
     update,
+    show,
+    hide,
+    sync,
     clear,
     getSpeakerMeta,
   };
 }
+

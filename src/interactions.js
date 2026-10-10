@@ -273,7 +273,7 @@ export function createInteractions(S, R, api) {
   function showOk(id) {
     clear();
     prompt.append(el('span', 'p-tag ok', 'DONE'));
-    prompt.append(el('p', 'p-hint', 'Scroll on to continue the story ↓'));
+    prompt.append(el('p', 'p-hint', 'Tap screen or press Space to continue the story ▶'));
     current = 'ok:' + id;
     okUntil = S.u + 0.45;
   }
