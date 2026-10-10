@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>The Last Drop Protocol</title>
+  <meta name="description" content="A scroll-driven story about the water crisis of Novaris: who controls the water, who is heard, and who is left waiting." />
+  <meta name="theme-color" content="#121a2e" />
+  <!-- Critical colours inline so there is never an unstyled flash -->
+  <style>
+    html, body { margin: 0; background: #121a2e; color: #f3e8d2; }
+    #entry { position: fixed; inset: 0; background: #121a2e; z-index: 50; }
+    body.booting * { transition: none !important; }
+  </style>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800;900&family=JetBrains+Mono:wght@400;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&display=swap" rel="stylesheet" />
+</head>
+<body class="booting">
+  <canvas id="scene" aria-hidden="true"></canvas>
+  <div id="grain" aria-hidden="true"></div>
+
+  <!-- tall track that the reader scrolls; its height grows as checkpoints are cleared -->
+  <div id="track" aria-hidden="true"></div>
+
+  <!-- clickable things positioned over the drawn scene -->
+  <div id="hotspots"></div>
+
+  <header id="masthead">
+    <span class="mast-title">The Last Drop Protocol</span>
+    <span class="mast-chapter" id="mastChapter"></span>
+  </header>
+
+  <nav id="nav" aria-label="Chapters">
+    <div class="nav-rail"><div class="nav-fill" id="navFill"></div></div>
+    <ol id="navTicks"></ol>
+  </nav>
+
+  <aside id="meter" aria-label="Live water readings">
+    <div class="m-row m-official">
+      <span class="m-k">CITY APP</span>
+      <span class="m-chip" id="mChip"><i></i><b id="mChipText">NORMAL</b></span>
+    </div>
+    <div class="m-row">
+      <span class="m-k">SURYASAGAR</span>
+      <span class="m-bar"><i id="mRes"></i></span>
+      <span class="m-v" id="mResV">18%</span>
+    </div>
+    <div class="m-row">
+      <span class="m-k">SHANTINAGAR</span>
+      <span class="m-bar warm"><i id="mSup"></i></span>
+      <span class="m-v" id="mSupV">30%</span>
+    </div>
+    <div class="m-row m-extra" id="mExtra">
+      <span class="m-k" id="mExtraK">RESERVE</span>
+      <span class="m-v wide" id="mExtraV">4:00:00</span>
+    </div>
+  </aside>
+
+  <section id="header" aria-live="polite">
+    <div class="h-strip">
+      <span class="h-num" id="hNum"></span>
+      <h2 class="h-title" id="hTitle"></h2>
+      <span class="h-sub" id="hSub"></span>
+    </div>
+  </section>
+
+  <section id="finale" aria-live="polite">
+    <p class="f-text" id="fText"></p>
+    <div class="f-extra" id="fExtra">
+      <button class="btn btn-ink" id="replay">Replay from the first drop</button>
+      <p class="f-credit">A story for SDG 6 · Clean Water &amp; Sanitation, SDG 10 · Reduced Inequalities, SDG 11 · Sustainable Cities.</p>
+      <p class="f-credit f-legal">A non-commercial fan story. The Avengers, Tony Stark, Thor, Bruce Banner and FRIDAY are characters and trademarks of Marvel. This project is not affiliated with or endorsed by Marvel. All artwork here is original.</p>
+    </div>
+  </section>
+
+  <div id="dock">
+    <div id="prompt" role="region" aria-label="Your move" aria-live="polite"></div>
+    <article id="card" aria-live="polite"></article>
+  </div>
+
+  <button id="mute" class="btn-mute" aria-pressed="false">
+    <span class="spk" aria-hidden="true"></span><span id="muteText">Sound off</span>
+  </button>
+
+  <div id="entry" role="dialog" aria-modal="true" aria-labelledby="entryTitle">
+    <div class="entry-inner">
+      <div class="entry-pipe" aria-hidden="true"><span class="ep-pipe"></span><span class="ep-tap"></span><span class="ep-drop"></span></div>
+      <p class="entry-kicker">Novaris · Shantinagar · 5:40 a.m.</p>
+      <h1 id="entryTitle" class="entry-title">The Last<br />Drop Protocol</h1>
+      <p class="entry-sub">A scroll story about water, power, and who gets heard.</p>
+      <div class="entry-btns">
+        <button class="btn btn-paper" id="startSound">Begin with sound</button>
+        <button class="btn btn-ghost" id="startQuiet">Begin in silence</button>
+      </div>
+      <p class="entry-note">Scroll to move through the story, and back to rewind. Some moments wait for your hand.</p>
+      <p class="entry-legal">Fan story · Avengers characters &amp; trademarks belong to Marvel · not affiliated or endorsed</p>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
