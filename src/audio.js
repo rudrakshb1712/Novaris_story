@@ -48,6 +48,41 @@ export function createAudio() {
   const airG = ac.createGain(); airG.gain.value = 0.02;
   air.connect(airF).connect(airG).connect(master); air.start();
 
+  // start page music track (assets/start.mp3)
+  let startTrack = null;
+  let startGain = null;
+  try {
+    startTrack = new Audio('/assets/start.mp3');
+    startTrack.loop = true;
+    startTrack.preload = 'auto';
+
+    if (ac.createMediaElementSource) {
+      const src = ac.createMediaElementSource(startTrack);
+      startGain = ac.createGain();
+      startGain.gain.value = 1.0;
+      src.connect(startGain).connect(master);
+    }
+  } catch (e) {
+    console.warn('[audio] media element source fallback:', e);
+  }
+
+  function playStart() {
+    if (!startTrack) return;
+    if (ac.state === 'suspended' && !muted) ac.resume();
+    startTrack.play().catch(() => {});
+  }
+
+  function stopStart() {
+    if (!startTrack) return;
+    startTrack.pause();
+  }
+
+  function resetStart() {
+    if (!startTrack) return;
+    startTrack.currentTime = 0;
+    if (!muted) startTrack.play().catch(() => {});
+  }
+
   let chapter = -1, muted = true, level = 0.0;
 
   function setChapter(n, u) {
@@ -59,6 +94,16 @@ export function createAudio() {
       lp.frequency.setTargetAtTime(n === 2 ? 900 : n === 5 || n === 6 ? 520 : n === 9 ? 620 : 760, now, 1.5);
       airF.frequency.setTargetAtTime(n >= 7 ? 1400 : 900, now, 2);
     }
+
+    // Start track plays during Start / Title & Chapter 1 (u < 9.1), then smoothly fades out into chapter 2
+    if (startGain) {
+      const isStart = u < 9.1;
+      startGain.gain.setTargetAtTime(isStart ? 1.0 : 0.0, now, 1.6);
+    } else if (startTrack) {
+      if (u >= 9.1 && !startTrack.paused) startTrack.pause();
+      else if (u < 9.1 && startTrack.paused && !muted) startTrack.play().catch(() => {});
+    }
+
     // the last chapter gets quieter and calmer
     const target = n === 9 ? 0.09 : n === 6 ? 0.12 : 0.13;
     if (Math.abs(target - level) > 0.001) { level = target; droneGain.gain.setTargetAtTime(level, now, 1.5); }
@@ -69,6 +114,13 @@ export function createAudio() {
     muted = m;
     if (!m && ac.state === 'suspended') ac.resume();
     master.gain.setTargetAtTime(m ? 0 : 0.9, ac.currentTime, 0.25);
+    if (startTrack) {
+      if (m) {
+        startTrack.pause();
+      } else if (chapter <= 1) {
+        startTrack.play().catch(() => {});
+      }
+    }
   }
 
   // ---- effects ----
@@ -114,5 +166,5 @@ export function createAudio() {
   };
   function play(name, arg) { try { fx[name] && fx[name](arg); } catch (e) { /* never let sound break the story */ } }
 
-  return { setChapter, setMuted, play, silence, get muted() { return muted; }, ctx: ac };
+  return { setChapter, setMuted, play, silence, playStart, stopStart, resetStart, get muted() { return muted; }, ctx: ac };
 }

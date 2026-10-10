@@ -318,12 +318,42 @@ function frame(now) {
 }
 
 // ---------- entry ----------
+let startAudioTriggered = false;
+function triggerStartAudio() {
+  if (started || startAudioTriggered) return;
+  startAudioTriggered = true;
+  audio = audio || createAudio();
+  if (audio) {
+    muted = false;
+    audio.setMuted(false);
+    audio.playStart();
+    syncMute();
+  }
+}
+
+// If user clicks anywhere on the start page before clicking Begin, start the soundtrack
+$('entry').addEventListener('pointerdown', (e) => {
+  if (e.target && e.target.id === 'startQuiet') return;
+  triggerStartAudio();
+}, { passive: true });
+
 function begin(withSound) {
   if (started) return;
   started = true;
   if (withSound) {
     audio = audio || createAudio();
-    if (audio) { muted = false; audio.setMuted(false); audio.setChapter(chapterAt(S.u).n, S.u); }
+    if (audio) {
+      muted = false;
+      audio.setMuted(false);
+      audio.playStart();
+      audio.setChapter(chapterAt(S.u).n, S.u);
+    }
+  } else {
+    if (audio) {
+      audio.stopStart();
+      audio.setMuted(true);
+    }
+    muted = true;
   }
   syncMute();
   $('entry').classList.add('gone');
@@ -357,6 +387,7 @@ $('replay').addEventListener('click', () => {
   lenis.scrollTo(0, { immediate: true, force: true });
   S.u = 0; S.uT = 0; prevU = 0;
   window.scrollTo(0, 0);
+  if (audio && !muted) audio.resetStart();
 });
 
 // ---------- Flying Iron Man cursor follower ----------
