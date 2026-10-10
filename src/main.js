@@ -259,6 +259,11 @@ export function jumpToBeat(index, immediate = false) {
 
   if (audio) {
     audio.setChapter(beat.chapter, beat.u);
+    if (beat.sound) {
+      audio.play(beat.sound);
+    } else if (beat.isFinale || currentBeatIndex === STORY_BEATS.length - 1) {
+      audio.playYee();
+    }
   }
 }
 
@@ -400,7 +405,7 @@ function layoutNav() {
 // ---------- Sound cues (forward only) ----------
 const CUES = [
   [19.6, 'glitch'], [20.3, 'denied'], [21.0, 'jet'], [24.2, 'denied'], [26.7, 'glitch'], [27.45, 'rupture'],
-  [28.8, 'hum'], [30.85, 'hum'], [38.7, 'pour'], [41.15, 'pour'], [51.6, 'jet'], [52.6, 'final'],
+  [28.8, 'hum'], [30.85, 'hum'], [38.7, 'pour'], [41.15, 'pour'], [51.6, 'jet'], [52.6, 'final'], [52.9, 'yee'],
 ];
 let prevU = 0;
 let silenced = false;

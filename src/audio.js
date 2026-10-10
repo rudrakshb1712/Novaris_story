@@ -102,6 +102,31 @@ export function createAudio() {
     console.warn('[audio] assemble track fallback:', e);
   }
 
+  // Yee sound effect for the ending last dialogue (assets/yee.mp3)
+  let yeeTrack = null;
+  try {
+    yeeTrack = new Audio('/assets/yee.mp3');
+    yeeTrack.preload = 'auto';
+  } catch (e) {
+    console.warn('[audio] yee track fallback:', e);
+  }
+
+  function playYee() {
+    if (muted) return;
+    try {
+      if (!yeeTrack) {
+        yeeTrack = new Audio('/assets/yee.mp3');
+        yeeTrack.preload = 'auto';
+      }
+      yeeTrack.currentTime = 0;
+      yeeTrack.volume = 1.0;
+      const p = yeeTrack.play();
+      if (p && p.catch) p.catch(() => {});
+    } catch (e) {
+      console.warn('[audio] playYee error:', e);
+    }
+  }
+
   function playStart() {
     if (!startTrack) return;
     if (ac.state === 'suspended' && !muted) ac.resume();
@@ -264,8 +289,9 @@ export function createAudio() {
     paper: () => { noise(4200, 1.5, 0.003, 0.1, 0.09, 'highpass'); setTimeout(() => tone(784, 'sine', 0.01, 0.1, 0.5), 80); },
     jet: () => { noise(400, 0.5, 0.8, 0.14, 2.5, 'lowpass'); },
     final: () => { [293.66, 369.99, 440, 554.37].forEach((f, i) => setTimeout(() => tone(f, 'sine', 0.3, 0.07, 3.5), i * 260)); },
+    yee: () => { playYee(); },
   };
   function play(name, arg) { try { fx[name] && fx[name](arg); } catch (e) { /* never let sound break the story */ } }
 
-  return { setChapter, setMuted, play, silence, playStart, stopStart, resetStart, get muted() { return muted; }, ctx: ac };
+  return { setChapter, setMuted, play, playYee, silence, playStart, stopStart, resetStart, get muted() { return muted; }, ctx: ac };
 }

@@ -554,8 +554,10 @@ export const STORY_BEATS = [
     chapterTitle: 'The Last Drop',
     speaker: 'narrator',
     text: 'The jet rises into the twilight. Novaris learned that water is not a privilege — it is a human right.',
+    cameraX: 2650,
     u: 53.0,
     hud: { status: 'PROTOCOL COMPLETE', suryasagar: 30, shantinagar: 85 },
+    sound: 'yee',
     isFinale: true
   }
 ];
