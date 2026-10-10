@@ -5,6 +5,7 @@ import { inv, clamp, win } from './util.js';
 import { createRenderer } from './render.js';
 import { createAudio } from './audio.js';
 import { createInteractions } from './interactions.js';
+import { createIronManCursor } from './ironman-cursor.js';
 
 // ---------- reload always starts at the top ----------
 if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
@@ -357,6 +358,12 @@ $('replay').addEventListener('click', () => {
   S.u = 0; S.uT = 0; prevU = 0;
   window.scrollTo(0, 0);
 });
+
+// ---------- Flying Iron Man cursor follower ----------
+if (window.matchMedia('(pointer: fine)').matches) {
+  document.body.classList.add('has-ironman-cursor');
+  createIronManCursor();
+}
 
 // ---------- repulsor flash on click (mouse only, skipped for reduced motion) ----------
 window.addEventListener('pointerdown', (e) => {
