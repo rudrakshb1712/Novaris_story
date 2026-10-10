@@ -145,7 +145,7 @@ export function createRenderer(canvas, S) {
     screen(c);
     const [top, bot, sun, haze] = sky(S.u);
     const g = c.createLinearGradient(0, 0, 0, H);
-    g.addColorStop(0, top); g.addColorStop(0.75, bot); g.addColorStop(1, haze);
+    g.addColorStop(0, top); g.addColorStop(0.5, bot); g.addColorStop(1, haze);
     c.fillStyle = g; c.fillRect(0, 0, W, H);
     // stars at the very end
     const st = ease(52.2, 54.5, S.u);

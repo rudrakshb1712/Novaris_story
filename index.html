@@ -5,11 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>The Last Drop Protocol</title>
   <meta name="description" content="A scroll-driven story about the water crisis of Novaris: who controls the water, who is heard, and who is left waiting." />
-  <meta name="theme-color" content="#121a2e" />
+  <meta name="theme-color" content="#1c140f" />
   <!-- Critical colours inline so there is never an unstyled flash -->
   <style>
-    html, body { margin: 0; background: #121a2e; color: #f3e8d2; }
-    #entry { position: fixed; inset: 0; background: #121a2e; z-index: 50; }
+    html, body { margin: 0; background: linear-gradient(180deg, #1c140f 0%, #4a2d1d 50%, #995c35 100%); color: #E6EDF3; }
+    #entry { position: fixed; inset: 0; background: #0b0f19; z-index: 50; }
     body.booting * { transition: none !important; }
   </style>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -86,7 +86,7 @@
   <div id="entry" role="dialog" aria-modal="true" aria-labelledby="entryTitle">
     <div class="entry-inner">
       <div class="entry-pipe" aria-hidden="true"><span class="ep-pipe"></span><span class="ep-tap"></span><span class="ep-drop"></span></div>
-      <p class="entry-kicker">Novaris · Shantinagar · 5:40 a.m.</p>
+      <p class="entry-kicker">Novaris · Shantinagar · <span class="timestamp">5:40 a.m.</span></p>
       <h1 id="entryTitle" class="entry-title">The Last<br />Drop Protocol</h1>
       <p class="entry-sub">A scroll story about water, power, and who gets heard.</p>
       <div class="entry-audio-note">

@@ -114,7 +114,7 @@ const lineHtml = ([who, text]) => {
   return `<div class="line"><span class="who ${WHO[who] || 'other'}">${av}${who}</span><span class="says">${text}</span></div>`;
 };
 function beatHtml(b) {
-  if (b.kind === 'prose') return b.html;
+  if (b.kind === 'prose') return b.html.replace(/\b(\d{1,2}:\d{2}\s*(?:a\.m\.|p\.m\.)?)/gi, '<span class="timestamp">$1</span>');
   if (b.kind === 'line') return b.lines.map(lineHtml).join('');
   if (b.kind === 'sys') return `<div class="sys-head">${b.head}</div>${b.html ? `<div>${b.html}</div>` : ''}${b.after ? `<div style="margin-top:${b.html ? 10 : 0}px">${lineHtml(b.after)}</div>` : ''}`;
   if (b.kind === 'list') return `<p><strong>${b.head}</strong></p><ul>${b.items.map(([a, d]) => `<li><b>${a}</b> ${d}</li>`).join('')}</ul>`;
