@@ -6,6 +6,7 @@ import { createRenderer } from './render.js';
 import { createAudio } from './audio.js';
 import { createInteractions } from './interactions.js';
 import { createIronManCursor } from './ironman-cursor.js';
+import { createSpeechClouds } from './speech-clouds.js';
 
 // ---------- reload always starts at the top ----------
 if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
@@ -24,6 +25,7 @@ const $ = (id) => document.getElementById(id);
 const canvas = $('scene');
 const track = $('track');
 const R = createRenderer(canvas, S);
+const speechClouds = createSpeechClouds(document.body, R, S);
 let audio = null;
 let muted = true;
 let started = false;
@@ -136,20 +138,31 @@ function updateText() {
   let op = 0;
   if (p) {
     op = Math.min(inv(p.b.u, p.b.u + 0.14, u), 1 - inv(p.end - 0.1, p.end, u));
-    if (shownBeat !== p.b) {
+    const isPureDialogue = p.b.kind === 'line';
+    if (isPureDialogue) {
+      // Character dialogue is displayed directly as animated comic speech clouds over characters' heads
+      card.hidden = true;
+      card.style.opacity = '0';
       shownBeat = p.b;
-      card.className = p.b.kind === 'sys' ? 'sys' : '';
-      card.innerHTML = beatHtml(p.b);
-      card.hidden = false;
-      cardH = card.offsetHeight;
+    } else {
+      if (shownBeat !== p.b) {
+        shownBeat = p.b;
+        card.className = p.b.kind === 'sys' ? 'sys' : '';
+        card.innerHTML = beatHtml(p.b);
+        card.hidden = false;
+        cardH = card.offsetHeight;
+      }
+      // on short screens, a waiting checkpoint prompt takes priority over the story card
+      const pr = $('prompt');
+      if (op > 0.01 && !pr.hidden && pr.offsetHeight + cardH + 12 > (window.innerWidth <= 720 ? window.innerHeight * 0.56 : window.innerHeight - 130)) op = 0;
+      card.hidden = op <= 0.01;
+      card.style.opacity = op.toFixed(3);
+      card.style.transform = `translateY(${((1 - op) * 10).toFixed(1)}px)`;
     }
+  } else {
+    card.hidden = true;
+    card.style.opacity = '0';
   }
-  // on short screens, a waiting checkpoint prompt takes priority over the story card
-  const pr = $('prompt');
-  if (op > 0.01 && !pr.hidden && pr.offsetHeight + cardH + 12 > (window.innerWidth <= 720 ? window.innerHeight * 0.56 : window.innerHeight - 130)) op = 0;
-  card.hidden = op <= 0.01;
-  card.style.opacity = op.toFixed(3);
-  card.style.transform = `translateY(${((1 - op) * 10).toFixed(1)}px)`;
   // chapter header
   let ho = 0;
   for (const h of HEADERS) {
@@ -320,6 +333,8 @@ function frame(now) {
     updateSound();
     updateAvoid();
     R.draw();
+    const curBeatInfo = pick(BEATS, S.u);
+    speechClouds.update(S.u, curBeatInfo ? curBeatInfo.b : null, curBeatInfo ? curBeatInfo.end : null);
     adapt(dt);
   } catch (e) {
     if (errCount++ < 5) console.error('[frame]', e);
@@ -391,6 +406,7 @@ $('replay').addEventListener('click', () => {
   S.done = {};
   S.cp = { local: Array(9).fill(false), evidence: [] };
   inter.reset();
+  speechClouds.clear();
   layoutTrack();
   lenis.resize();
   lenis.scrollTo(0, { immediate: true, force: true });

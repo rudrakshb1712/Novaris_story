@@ -12,6 +12,7 @@ export function createRenderer(canvas, S) {
   const bctx = buf.getContext('2d', { alpha: false });
   let W = 1, H = 1, pr = 1;
   const labels = [];
+  const activeFigures = {};
   const parts = [];
 
   // halftone pattern (pre-rendered once)
@@ -137,6 +138,33 @@ export function createRenderer(canvas, S) {
     const o = 1.6 / curCam.k;
     const r = drawFigure(c, spec, x, y, { t: S.t, o, ...opts });
     if (lab && spec.label && curCam.k * (opts.s || 1) * (spec.s || 1) * 50 > 46) label(spec.label, r.head[0], r.head[1]);
+
+    // Track figure coordinates for dynamic speech bubbles
+    if (spec && curCam) {
+      const name = typeof key === 'string' ? key : (spec.label || '');
+      const id = (spec.label || name || '').toUpperCase();
+      if (id) {
+        const s = (opts.s || 1) * (spec.s || 1);
+        const [hx, hy] = w2s(r.head[0], r.head[1] - 8 * s);
+        const [mx, my] = w2s(r.head[0], r.head[1] + 3 * s);
+        const [fx, fy] = w2s(x, y);
+        activeFigures[id] = {
+          id,
+          rawKey: name.toLowerCase(),
+          headX: hx,
+          headY: hy,
+          mouthX: mx,
+          mouthY: my,
+          feetX: fx,
+          feetY: fy,
+          facing: opts.f || 1,
+          scale: curCam.k * s,
+          worldX: x,
+          worldY: y,
+          visible: hx >= -60 && hx <= W + 60 && hy >= -60 && hy <= H + 60,
+        };
+      }
+    }
     return r;
   }
 
@@ -1129,12 +1157,16 @@ export function createRenderer(canvas, S) {
   let lastCity = null;
   function draw() {
     labels.length = 0;
+    for (const k in activeFigures) delete activeFigures[k];
     const sets = setsAt(S.u);
     const first = sets[0];
     const cam0 = drawSet(ctx, first.set, first.cam);
     if (first.set === 'city') lastCity = cam0;
     if (sets.length > 1) {
-      labels.length = 0;
+      if (sets[1].w > 0.5) {
+        labels.length = 0;
+        for (const k in activeFigures) delete activeFigures[k];
+      }
       const cam1 = drawSet(bctx, sets[1].set, sets[1].cam);
       if (sets[1].set === 'city') lastCity = cam1;
       ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -1150,6 +1182,25 @@ export function createRenderer(canvas, S) {
     if (!S.hideLabels) drawLabels(ctx);
   }
 
+  function getFigure(name) {
+    if (!name) return null;
+    const id = name.toUpperCase().trim();
+    if (activeFigures[id]) return activeFigures[id];
+    if (id === 'TONY' || id === 'STARK') return activeFigures['TONY'] || activeFigures['IRONMAN'];
+    if (id === 'IRONMAN' || id === 'IRON MAN') return activeFigures['IRONMAN'] || activeFigures['TONY'];
+    if (id === 'BRUCE' || id === 'BANNER' || id === 'HULK') return activeFigures['BRUCE'];
+    if (id === 'THOR') return activeFigures['THOR'];
+    if (id === 'ASHA') return activeFigures['ASHA'];
+    if (id === 'AARAV') return activeFigures['AARAV'];
+    if (id === 'MEERA') return activeFigures['MEERA'];
+    if (id === 'TECHNICIAN' || id === 'TECH') return activeFigures['TECH'] || activeFigures['TECHNICIAN'];
+    if (id === 'ENGINEER') return activeFigures['ENGINEER'];
+    if (id === 'WORKER') return activeFigures['WORKER'];
+    if (id === 'OFFICIAL') return activeFigures['OFFICIAL'];
+    if (id === 'RESIDENT' || id === 'ELDER') return activeFigures['ELDER'] || activeFigures['RESIDENT'];
+    return null;
+  }
+
   /** world → screen for the hotspots (city set only) */
   function project(x, y) {
     if (!lastCity) return null;
@@ -1157,7 +1208,18 @@ export function createRenderer(canvas, S) {
     return [c.fx + (x - c.x) * c.k, c.fy + (y - c.y) * c.k];
   }
 
-  return { resize, draw, burst, project, hudGeom, get W() { return W; }, get H() { return H; } };
+  return {
+    resize,
+    draw,
+    burst,
+    project,
+    getFigure,
+    getActiveFigures: () => activeFigures,
+    w2s: (x, y) => curCam ? w2s(x, y) : null,
+    hudGeom,
+    get W() { return W; },
+    get H() { return H; }
+  };
 }
 
 export const EVIDENCE = { notice: [195, -87], tap: [158, -40], terminal: [110, -35] };

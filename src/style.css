@@ -588,6 +588,175 @@ body.started .btn-mute { opacity: 1; }
 .entry-legal { font-family: var(--mono); font-size: 10px; letter-spacing: .02em; color: #6b7280; margin: 14px auto 0; max-width: 420px; line-height: 1.5; }
 .f-legal { font-size: 10px; opacity: .85; }
 
+/* ---------- Comic-Book / Storybook Speech Clouds ---------- */
+.comic-bubbles-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 8;
+  overflow: hidden;
+}
+
+.comic-speech-cloud {
+  position: fixed;
+  pointer-events: auto;
+  box-sizing: border-box;
+  background: #ffffff;
+  border: 2.5px solid #1a1a1a;
+  border-radius: 20px;
+  box-shadow: 4px 4px 0px rgba(0, 0, 0, 0.35);
+  padding: 10px 15px 11px;
+  color: #111827;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  transform-origin: center bottom;
+  will-change: transform, opacity, left, top;
+  transition: opacity 0.22s ease-out, transform 0.22s ease-out;
+}
+
+/* Pop-in elastic bounce animation */
+.comic-speech-cloud.bubble-pop {
+  animation: bubblePop 350ms cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+.comic-speech-cloud.fade-out {
+  opacity: 0 !important;
+  transform: scale(0.8) translateY(6px) !important;
+  transition: opacity 0.22s ease-in, transform 0.22s ease-in !important;
+}
+
+@keyframes bubblePop {
+  0% {
+    opacity: 0;
+    transform: scale(0.6) translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Comic triangle pointer / tail pointing DOWN (default) */
+.comic-speech-cloud::before,
+.comic-speech-cloud::after {
+  content: '';
+  position: absolute;
+  left: var(--tail-left, 50%);
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-style: solid;
+}
+
+/* Outer border triangle */
+.comic-speech-cloud::before {
+  bottom: -16px;
+  border-width: 16px 11px 0 11px;
+  border-color: #1a1a1a transparent transparent transparent;
+  filter: drop-shadow(2px 2px 0 rgba(0, 0, 0, 0.25));
+  z-index: 1;
+}
+
+/* Inner white fill triangle */
+.comic-speech-cloud::after {
+  bottom: -12.5px;
+  border-width: 13.5px 8.5px 0 8.5px;
+  border-color: #ffffff transparent transparent transparent;
+  z-index: 2;
+}
+
+/* Flipped tail pointing UP (when bubble is placed below character) */
+.comic-speech-cloud.tail-up {
+  transform-origin: center top;
+}
+.comic-speech-cloud.tail-up::before {
+  bottom: auto;
+  top: -16px;
+  border-width: 0 11px 16px 11px;
+  border-color: transparent transparent #1a1a1a transparent;
+}
+.comic-speech-cloud.tail-up::after {
+  bottom: auto;
+  top: -12.5px;
+  border-width: 0 8.5px 13.5px 8.5px;
+  border-color: transparent transparent #ffffff transparent;
+}
+
+/* When tail is disabled (transmission or offscreen) */
+.comic-speech-cloud.no-tail::before,
+.comic-speech-cloud.no-tail::after {
+  display: none;
+}
+
+/* Header with speaker pill & avatar */
+.comic-cloud-header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 5px;
+}
+
+.comic-cloud-avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  object-fit: contain;
+  border: 1.5px solid #1a1a1a;
+  background: #f3f4f6;
+  flex-shrink: 0;
+}
+
+.comic-cloud-initials {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 800;
+  border: 1.5px solid currentColor;
+  flex-shrink: 0;
+}
+
+.comic-speaker-tag {
+  font-family: var(--mono);
+  font-weight: 800;
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 1.5px 7px 1px;
+  border-radius: 4px;
+  border: 1px solid currentColor;
+  line-height: 1.2;
+}
+
+/* Speech Cloud Text */
+.comic-cloud-body {
+  font-size: 0.95rem;
+  line-height: 1.45;
+  color: #111827;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.comic-cloud-body em {
+  font-style: italic;
+  font-weight: 700;
+  color: #000000;
+}
+
+/* Digital Transmission variant (FRIDAY, AQUA-9, Thirst Engine) */
+.comic-speech-cloud.transmission-cloud {
+  background: #0f172a;
+  color: #f1f5f9;
+  border-color: #38bdf8;
+  box-shadow: 0 0 16px rgba(56, 189, 248, 0.35), 4px 4px 0 rgba(0, 0, 0, 0.6);
+}
+.comic-speech-cloud.transmission-cloud .comic-cloud-body {
+  color: #f1f5f9;
+}
+
 /* ---------- Flying Iron Man Cursor & Reticle ---------- */
 @media (pointer: fine) {
   /* Fallback SVG Iron Man cursor if JS has not initialized */
