@@ -7,14 +7,18 @@ export const INK = '#18203a';
 // Avengers character face portraits
 export const FACES = {};
 const FACE_FILES = {
-  tony: '/assets/avengers/tony.png',
-  thor: '/assets/avengers/thor.png',
-  bruce: '/assets/avengers/bruce(hulk).png',
+  tony: '/assets/avengers/iron%20man.png?v=2',
+  ironman: '/assets/avengers/iron%20man.png?v=2',
+  thor: '/assets/avengers/thor.png?v=2',
+  bruce: '/assets/avengers/bruce(hulk).png?v=2',
 };
 for (const [key, src] of Object.entries(FACE_FILES)) {
   const img = new Image();
   img.src = src;
   img.onload = () => { FACES[key] = img; };
+  if (img.complete && img.naturalWidth > 0) {
+    FACES[key] = img;
+  }
 }
 
 export const CAST = {
@@ -22,6 +26,7 @@ export const CAST = {
   aarav: { skin: '#a86a40', hair: '#1d1612', style: 'cap', cap: '#e2412f', top: '#f4ead6', stripe: '#2a7cff', bottom: '#5a6b8c', s: 0.7, label: 'AARAV' },
   meera: { skin: '#a5683f', hair: '#211814', style: 'hardhat', hat: '#ffcf3f', glasses: true, top: '#2a7cff', bottom: '#2b3556', label: 'MEERA' },
   tony: { faceKey: 'tony', skin: '#d9a27c', hair: '#2a1d16', style: 'short', armour: true, top: '#8f9aab', trim: '#5b6577', bottom: '#7d889a', glow: true, label: 'TONY' },
+  ironman: { faceKey: 'ironman', skin: '#d9a27c', hair: '#2a1d16', style: 'short', armour: true, top: '#8f9aab', trim: '#5b6577', bottom: '#7d889a', glow: true, label: 'TONY' },
   bruce: { faceKey: 'bruce', skin: '#e0b08a', hair: '#6f6458', style: 'messy', glasses: true, top: '#7c8a4a', bottom: '#4a4f5e', label: 'BRUCE' },
   thor: { faceKey: 'thor', skin: '#e8b894', hair: '#dfb04a', style: 'long', top: '#3b4660', trim: '#9aa6c0', bottom: '#2d3448', cape: '#c8402a', s: 1.08, label: 'THOR' },
   elder: { skin: '#9c6440', hair: '#ece6da', style: 'bun', top: '#c9c2d8', dress: 'long', border: '#7b3c8a', bottom: '#c9c2d8', s: 0.92 },

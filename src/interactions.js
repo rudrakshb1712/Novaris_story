@@ -105,8 +105,8 @@ export function createInteractions(S, R, api) {
 
     choice() {
       const { row, msg } = shell('YOUR CHOICE', 'What does Novaris need?', 'Thor offers to call the rain. Bruce isn\'t sure. Pick one.');
-      const rain = el('button', 'btn btn-warm', '<img class="btn-avatar" src="/assets/avengers/thor.png" alt="Thor" /> Summon rain');
-      const find = el('button', 'btn btn-blue', '<img class="btn-avatar" src="/assets/avengers/tony.png" alt="Tony" /> Find the source');
+      const rain = el('button', 'btn btn-warm', '<img class="btn-avatar" src="/assets/avengers/thor.png?v=2" alt="Thor" /> Summon rain');
+      const find = el('button', 'btn btn-blue', '<img class="btn-avatar" src="/assets/avengers/iron%20man.png?v=2" alt="Tony" /> Find the source');
       row.append(rain, find);
       let finished = false;
       press(rain, () => {
@@ -125,7 +125,7 @@ export function createInteractions(S, R, api) {
     },
 
     brace() {
-      const { row, msg } = shell('PRESS AND HOLD', 'Hold the beam', '<span style="display:inline-flex;align-items:center;gap:6px"><img class="prompt-avatar" src="/assets/avengers/thor.png" alt="Thor" /> The machine is tearing bolts from the wall. Hold so Thor can brace the support beam.</span>');
+      const { row, msg } = shell('PRESS AND HOLD', 'Hold the beam', '<span style="display:inline-flex;align-items:center;gap:6px"><img class="prompt-avatar" src="/assets/avengers/thor.png?v=2" alt="Thor" /> The machine is tearing bolts from the wall. Hold so Thor can brace the support beam.</span>');
       const btn = el('button', 'btn btn-paper hold', '<i class="fill"></i><span>Hold to brace</span>'); row.append(btn);
       const hs = hotspot('HOLD', 'small');
       const fill = btn.querySelector('.fill');
@@ -135,7 +135,7 @@ export function createInteractions(S, R, api) {
     },
 
     valve() {
-      const { row, msg } = shell('TIMING', 'Ease the pressure', '<span style="display:inline-flex;align-items:center;gap:6px"><img class="prompt-avatar" src="/assets/avengers/bruce(hulk).png" alt="Bruce" /> Bruce is turning the balancing valve. Press when the needle swings into the green.</span>');
+      const { row, msg } = shell('TIMING', 'Ease the pressure', '<span style="display:inline-flex;align-items:center;gap:6px"><img class="prompt-avatar" src="/assets/avengers/bruce(hulk).png?v=2" alt="Bruce" /> Bruce is turning the balancing valve. Press when the needle swings into the green.</span>');
       const g = el('div', 'gauge');
       g.innerHTML = `<svg viewBox="0 0 104 64" aria-hidden="true"><path d="M8 58 A44 44 0 0 1 96 58" fill="none" stroke="#f4ead6" stroke-width="10"/><path d="M52 14 A44 44 0 0 1 86.3 30.6" fill="none" stroke="#36b86a" stroke-width="10"/><path d="M86.3 30.6 A44 44 0 0 1 96 58" fill="none" stroke="#e2412f" stroke-width="10"/><line id="needle" x1="52" y1="58" x2="52" y2="18" stroke="#ffcf3f" stroke-width="3.5" stroke-linecap="round"/><circle cx="52" cy="58" r="5" fill="#ffcf3f"/></svg>`;
       const btn = el('button', 'btn btn-paper', 'Turn the valve now');

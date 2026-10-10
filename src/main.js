@@ -102,11 +102,12 @@ window.addEventListener('keydown', (e) => {
 const card = $('card');
 const hdr = $('header'), hNum = $('hNum'), hTitle = $('hTitle'), hSub = $('hSub');
 const fin = $('finale'), fText = $('fText');
-const WHO = { ASHA: 'asha', AARAV: 'aarav', MEERA: 'meera', TONY: 'tony', BRUCE: 'bruce', THOR: 'thor', FRIDAY: 'friday', 'THE VOICE': 'engine', 'THE THIRST ENGINE': 'engine' };
+const WHO = { ASHA: 'asha', AARAV: 'aarav', MEERA: 'meera', TONY: 'tony', IRONMAN: 'tony', BRUCE: 'bruce', THOR: 'thor', FRIDAY: 'friday', 'THE VOICE': 'engine', 'THE THIRST ENGINE': 'engine' };
 const AVATARS = {
-  TONY: '/assets/avengers/tony.png',
-  BRUCE: '/assets/avengers/bruce(hulk).png',
-  THOR: '/assets/avengers/thor.png',
+  TONY: '/assets/avengers/iron%20man.png?v=2',
+  IRONMAN: '/assets/avengers/iron%20man.png?v=2',
+  BRUCE: '/assets/avengers/bruce(hulk).png?v=2',
+  THOR: '/assets/avengers/thor.png?v=2',
 };
 const lineHtml = ([who, text]) => {
   const av = AVATARS[who] ? `<img class="who-avatar" src="${AVATARS[who]}" alt="${who}" />` : '';
