@@ -86,10 +86,17 @@ export function createAudio() {
     assembleTrack.addEventListener('ended', () => {
       assemblePlaying = false;
       assembleEnded = true;
-      // After it ends, the previously playing ambient audio continues smoothly!
+      // After assemble audio ends, continue the start audio till the end!
       const currTime = ac.currentTime;
-      droneGain.gain.setTargetAtTime(level, currTime, 1.2);
-      airG.gain.setTargetAtTime(0.02, currTime, 1.2);
+      if (startTrack && !muted) {
+        if (startGain) {
+          startGain.gain.setValueAtTime(0.001, currTime);
+          startGain.gain.setTargetAtTime(1.0, currTime, 1.2);
+        }
+        startTrack.play().catch(() => {});
+      }
+      droneGain.gain.setTargetAtTime(0.06, currTime, 1.2);
+      airG.gain.setTargetAtTime(0.015, currTime, 1.2);
     });
   } catch (e) {
     console.warn('[audio] assemble track fallback:', e);
@@ -109,6 +116,7 @@ export function createAudio() {
   function playAssemble() {
     if (!assembleTrack || muted || assembleEnded) return;
     assemblePlaying = true;
+    if (startTrack) startTrack.pause();
     droneGain.gain.setTargetAtTime(0.0, ac.currentTime, 0.4);
     airG.gain.setTargetAtTime(0.005, ac.currentTime, 0.4);
     assembleTrack.play().catch(() => {});
@@ -121,10 +129,6 @@ export function createAudio() {
   }
 
   function resetStart() {
-    if (startTrack) {
-      startTrack.currentTime = 0;
-      if (!muted) startTrack.play().catch(() => {});
-    }
     if (assembleTrack) {
       assembleTrack.pause();
       assembleTrack.currentTime = 0;
@@ -132,6 +136,10 @@ export function createAudio() {
     assemblePlayedForCh3 = false;
     assemblePlaying = false;
     assembleEnded = false;
+    if (startTrack) {
+      startTrack.currentTime = 0;
+      if (!muted) startTrack.play().catch(() => {});
+    }
   }
 
   let chapter = -1, muted = true, level = 0.0;
@@ -151,7 +159,8 @@ export function createAudio() {
           assemblePlayedForCh3 = true;
           assemblePlaying = true;
           assembleEnded = false;
-          // Duck the ambient drone while Assemble track plays
+          // Duck startTrack and drone while Assemble plays
+          if (startTrack) startTrack.pause();
           droneGain.gain.setTargetAtTime(0.0, now, 0.4);
           airG.gain.setTargetAtTime(0.005, now, 0.4);
           assembleTrack.currentTime = 0;
@@ -168,13 +177,18 @@ export function createAudio() {
       }
     }
 
-    // Start track plays during Start / Title & Chapter 1 (u < 9.1), then smoothly fades out into chapter 2
+    // Start track plays during Start / Title & Chapter 1 (u < 9.1),
+    // and after assemble audio ends in Chapter 3, continues playing till the end of the story!
+    const shouldPlayStart = (u < 9.1) || ((assembleEnded || u >= 21.1) && !assemblePlaying);
     if (startGain) {
-      const isStart = u < 9.1;
-      startGain.gain.setTargetAtTime(isStart ? 1.0 : 0.0, now, 1.6);
-    } else if (startTrack) {
-      if (u >= 9.1 && !startTrack.paused) startTrack.pause();
-      else if (u < 9.1 && startTrack.paused && !muted) startTrack.play().catch(() => {});
+      startGain.gain.setTargetAtTime(shouldPlayStart ? 1.0 : 0.0, now, 1.4);
+    }
+    if (startTrack) {
+      if (shouldPlayStart && startTrack.paused && !muted) {
+        startTrack.play().catch(() => {});
+      } else if (!shouldPlayStart && !startTrack.paused) {
+        startTrack.pause();
+      }
     }
 
     // the last chapter gets quieter and calmer
@@ -199,10 +213,13 @@ export function createAudio() {
       if (startTrack) startTrack.pause();
       if (assembleTrack) assembleTrack.pause();
     } else {
-      if (chapter === 3 && !assembleEnded && assemblePlayedForCh3) {
+      if (chapter === 3 && assemblePlaying && !assembleEnded) {
         playAssemble();
-      } else if (chapter <= 1 && startTrack) {
-        startTrack.play().catch(() => {});
+      } else {
+        const shouldPlayStart = (chapter <= 1) || assembleEnded || (chapter >= 4);
+        if (shouldPlayStart && startTrack) {
+          startTrack.play().catch(() => {});
+        }
       }
     }
   }
