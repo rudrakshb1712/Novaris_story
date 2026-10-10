@@ -63,7 +63,36 @@ export function createAudio() {
       src.connect(startGain).connect(master);
     }
   } catch (e) {
-    console.warn('[audio] media element source fallback:', e);
+    console.warn('[audio] start track fallback:', e);
+  }
+
+  // Chapter 3 Assemble audio track (assets/Assemble.mp4)
+  let assembleTrack = null;
+  let assembleGain = null;
+  let assemblePlaying = false;
+  let assembleEnded = false;
+  let assemblePlayedForCh3 = false;
+  try {
+    assembleTrack = new Audio('/assets/Assemble.mp4');
+    assembleTrack.preload = 'auto';
+
+    if (ac.createMediaElementSource) {
+      const src = ac.createMediaElementSource(assembleTrack);
+      assembleGain = ac.createGain();
+      assembleGain.gain.value = 1.0;
+      src.connect(assembleGain).connect(master);
+    }
+
+    assembleTrack.addEventListener('ended', () => {
+      assemblePlaying = false;
+      assembleEnded = true;
+      // After it ends, the previously playing ambient audio continues smoothly!
+      const currTime = ac.currentTime;
+      droneGain.gain.setTargetAtTime(level, currTime, 1.2);
+      airG.gain.setTargetAtTime(0.02, currTime, 1.2);
+    });
+  } catch (e) {
+    console.warn('[audio] assemble track fallback:', e);
   }
 
   function playStart() {
@@ -77,10 +106,32 @@ export function createAudio() {
     startTrack.pause();
   }
 
+  function playAssemble() {
+    if (!assembleTrack || muted || assembleEnded) return;
+    assemblePlaying = true;
+    droneGain.gain.setTargetAtTime(0.0, ac.currentTime, 0.4);
+    airG.gain.setTargetAtTime(0.005, ac.currentTime, 0.4);
+    assembleTrack.play().catch(() => {});
+  }
+
+  function pauseAssemble() {
+    if (!assembleTrack) return;
+    assemblePlaying = false;
+    assembleTrack.pause();
+  }
+
   function resetStart() {
-    if (!startTrack) return;
-    startTrack.currentTime = 0;
-    if (!muted) startTrack.play().catch(() => {});
+    if (startTrack) {
+      startTrack.currentTime = 0;
+      if (!muted) startTrack.play().catch(() => {});
+    }
+    if (assembleTrack) {
+      assembleTrack.pause();
+      assembleTrack.currentTime = 0;
+    }
+    assemblePlayedForCh3 = false;
+    assemblePlaying = false;
+    assembleEnded = false;
   }
 
   let chapter = -1, muted = true, level = 0.0;
@@ -93,6 +144,28 @@ export function createAudio() {
       voices.forEach((o, i) => o.frequency.setTargetAtTime(ch[i], now, 1.2));
       lp.frequency.setTargetAtTime(n === 2 ? 900 : n === 5 || n === 6 ? 520 : n === 9 ? 620 : 760, now, 1.5);
       airF.frequency.setTargetAtTime(n >= 7 ? 1400 : 900, now, 2);
+
+      // Chapter 3: Play Assemble track
+      if (n === 3) {
+        if (!assemblePlayedForCh3 && assembleTrack && !muted) {
+          assemblePlayedForCh3 = true;
+          assemblePlaying = true;
+          assembleEnded = false;
+          // Duck the ambient drone while Assemble track plays
+          droneGain.gain.setTargetAtTime(0.0, now, 0.4);
+          airG.gain.setTargetAtTime(0.005, now, 0.4);
+          assembleTrack.currentTime = 0;
+          assembleTrack.play().catch(() => {});
+        }
+      } else {
+        // If moving away from Chapter 3 while assemble is playing, pause it
+        if (assemblePlaying && assembleTrack) {
+          pauseAssemble();
+        }
+        if (n < 3) {
+          assemblePlayedForCh3 = false;
+        }
+      }
     }
 
     // Start track plays during Start / Title & Chapter 1 (u < 9.1), then smoothly fades out into chapter 2
@@ -106,18 +179,29 @@ export function createAudio() {
 
     // the last chapter gets quieter and calmer
     const target = n === 9 ? 0.09 : n === 6 ? 0.12 : 0.13;
-    if (Math.abs(target - level) > 0.001) { level = target; droneGain.gain.setTargetAtTime(level, now, 1.5); }
+    if (Math.abs(target - level) > 0.001) {
+      level = target;
+      if (!assemblePlaying) {
+        droneGain.gain.setTargetAtTime(level, now, 1.5);
+      }
+    }
   }
-  function silence(on) { droneGain.gain.setTargetAtTime(on ? 0.0 : level, ac.currentTime, on ? 0.08 : 1.2); }
+  function silence(on) {
+    if (assemblePlaying) return;
+    droneGain.gain.setTargetAtTime(on ? 0.0 : level, ac.currentTime, on ? 0.08 : 1.2);
+  }
 
   function setMuted(m) {
     muted = m;
     if (!m && ac.state === 'suspended') ac.resume();
     master.gain.setTargetAtTime(m ? 0 : 0.9, ac.currentTime, 0.25);
-    if (startTrack) {
-      if (m) {
-        startTrack.pause();
-      } else if (chapter <= 1) {
+    if (m) {
+      if (startTrack) startTrack.pause();
+      if (assembleTrack) assembleTrack.pause();
+    } else {
+      if (chapter === 3 && !assembleEnded && assemblePlayedForCh3) {
+        playAssemble();
+      } else if (chapter <= 1 && startTrack) {
         startTrack.play().catch(() => {});
       }
     }
