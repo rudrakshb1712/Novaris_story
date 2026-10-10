@@ -103,7 +103,15 @@ const card = $('card');
 const hdr = $('header'), hNum = $('hNum'), hTitle = $('hTitle'), hSub = $('hSub');
 const fin = $('finale'), fText = $('fText');
 const WHO = { ASHA: 'asha', AARAV: 'aarav', MEERA: 'meera', TONY: 'tony', BRUCE: 'bruce', THOR: 'thor', FRIDAY: 'friday', 'THE VOICE': 'engine', 'THE THIRST ENGINE': 'engine' };
-const lineHtml = ([who, text]) => `<div class="line"><span class="who ${WHO[who] || 'other'}">${who}</span><span class="says">${text}</span></div>`;
+const AVATARS = {
+  TONY: '/assets/avengers/tony.png',
+  BRUCE: '/assets/avengers/bruce(hulk).png',
+  THOR: '/assets/avengers/thor.png',
+};
+const lineHtml = ([who, text]) => {
+  const av = AVATARS[who] ? `<img class="who-avatar" src="${AVATARS[who]}" alt="${who}" />` : '';
+  return `<div class="line"><span class="who ${WHO[who] || 'other'}">${av}${who}</span><span class="says">${text}</span></div>`;
+};
 function beatHtml(b) {
   if (b.kind === 'prose') return b.html;
   if (b.kind === 'line') return b.lines.map(lineHtml).join('');

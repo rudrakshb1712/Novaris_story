@@ -4,13 +4,26 @@ import { hash } from './util.js';
 
 export const INK = '#18203a';
 
+// Avengers character face portraits
+export const FACES = {};
+const FACE_FILES = {
+  tony: '/assets/avengers/tony.png',
+  thor: '/assets/avengers/thor.png',
+  bruce: '/assets/avengers/bruce(hulk).png',
+};
+for (const [key, src] of Object.entries(FACE_FILES)) {
+  const img = new Image();
+  img.src = src;
+  img.onload = () => { FACES[key] = img; };
+}
+
 export const CAST = {
   asha: { skin: '#b5714a', hair: '#1d1612', style: 'braid', top: '#2fb5a6', dress: true, bottom: '#3d3a66', scarf: '#ffcf3f', label: 'ASHA' },
   aarav: { skin: '#a86a40', hair: '#1d1612', style: 'cap', cap: '#e2412f', top: '#f4ead6', stripe: '#2a7cff', bottom: '#5a6b8c', s: 0.7, label: 'AARAV' },
   meera: { skin: '#a5683f', hair: '#211814', style: 'hardhat', hat: '#ffcf3f', glasses: true, top: '#2a7cff', bottom: '#2b3556', label: 'MEERA' },
-  tony: { skin: '#d9a27c', hair: '#2a1d16', style: 'short', armour: true, top: '#8f9aab', trim: '#5b6577', bottom: '#7d889a', glow: true, label: 'TONY' },
-  bruce: { skin: '#e0b08a', hair: '#6f6458', style: 'messy', glasses: true, top: '#7c8a4a', bottom: '#4a4f5e', label: 'BRUCE' },
-  thor: { skin: '#e8b894', hair: '#dfb04a', style: 'long', top: '#3b4660', trim: '#9aa6c0', bottom: '#2d3448', cape: '#c8402a', s: 1.08, label: 'THOR' },
+  tony: { faceKey: 'tony', skin: '#d9a27c', hair: '#2a1d16', style: 'short', armour: true, top: '#8f9aab', trim: '#5b6577', bottom: '#7d889a', glow: true, label: 'TONY' },
+  bruce: { faceKey: 'bruce', skin: '#e0b08a', hair: '#6f6458', style: 'messy', glasses: true, top: '#7c8a4a', bottom: '#4a4f5e', label: 'BRUCE' },
+  thor: { faceKey: 'thor', skin: '#e8b894', hair: '#dfb04a', style: 'long', top: '#3b4660', trim: '#9aa6c0', bottom: '#2d3448', cape: '#c8402a', s: 1.08, label: 'THOR' },
   elder: { skin: '#9c6440', hair: '#ece6da', style: 'bun', top: '#c9c2d8', dress: 'long', border: '#7b3c8a', bottom: '#c9c2d8', s: 0.92 },
   tech: { skin: '#c48a62', hair: '#2b2018', style: 'short', top: '#5d6f8f', bottom: '#2b3556', lanyard: true },
   official: { skin: '#b07850', hair: '#3a3a3a', style: 'short', top: '#3a3f4f', bottom: '#2b2f3b', tie: '#c8402a' },
@@ -114,7 +127,7 @@ export function drawFigure(ctx, spec, x, y, opts = {}) {
     behind.push(Ln(-4, -40 + by, -7 + sw, -22 + by, 4.2, spec.hair));
     behind.push(C(-7 + sw, -21 + by, 2.4, spec.scarf || spec.hair));
   }
-  if (spec.style === 'long') behind.push(R(-9.5, -46 + by, 19, 22, 6, spec.hair));
+  if (spec.style === 'long' && !spec.faceKey) behind.push(R(-9.5, -46 + by, 19, 22, 6, spec.hair));
 
   // legs
   const legs = [];
@@ -157,16 +170,20 @@ export function drawFigure(ctx, spec, x, y, opts = {}) {
 
   // head
   const hy = -42 + by;
-  const head = [C(0, hy, 8.6, spec.skin)];
+  const faceImg = spec.faceKey ? FACES[spec.faceKey] : null;
+  const head = [];
   const hair = [];
-  switch (spec.style) {
-    case 'braid': hair.push(P([-8.6, hy - 1, -6, hy - 8, 2, hy - 9.6, 8.4, hy - 4, 8.6, hy - 1.5, 3, hy - 5.5, -3, hy - 4.5], spec.hair)); break;
-    case 'short': hair.push(P([-8.8, hy, -7, hy - 7.5, 0, hy - 10, 7.5, hy - 7, 8.8, hy - 2, 4, hy - 6, -4, hy - 5.6], spec.hair)); break;
-    case 'messy': hair.push(P([-9.4, hy + 1, -8.5, hy - 7, -3, hy - 11, 2, hy - 9.5, 6, hy - 11, 9.4, hy - 4, 8.8, hy - 1, 4, hy - 6, -3, hy - 5], spec.hair)); break;
-    case 'long': hair.push(P([-9.2, hy + 4, -8.5, hy - 6, 0, hy - 10.4, 8.5, hy - 6, 9.2, hy + 2, 6, hy - 4, -4, hy - 5], spec.hair)); break;
-    case 'bun': hair.push(C(-6.5, hy - 6.5, 4, spec.hair)); hair.push(P([-8.8, hy, -7, hy - 7.5, 0, hy - 9.8, 7.5, hy - 7, 8.6, hy - 1, 3, hy - 5.5, -4, hy - 5], spec.hair)); break;
-    case 'cap': hair.push({ t: 'q', x: 0, y: hy - 2, r: 9.2, col: spec.cap }); hair.push(R(2, hy - 3.2, 11, 3, 1.5, spec.cap)); break;
-    case 'hardhat': hair.push({ t: 'q', x: 0, y: hy - 3, r: 9.6, col: spec.hat }); hair.push(R(-11, hy - 4, 22, 3, 1.5, spec.hat)); break;
+  if (!faceImg) {
+    head.push(C(0, hy, 8.6, spec.skin));
+    switch (spec.style) {
+      case 'braid': hair.push(P([-8.6, hy - 1, -6, hy - 8, 2, hy - 9.6, 8.4, hy - 4, 8.6, hy - 1.5, 3, hy - 5.5, -3, hy - 4.5], spec.hair)); break;
+      case 'short': hair.push(P([-8.8, hy, -7, hy - 7.5, 0, hy - 10, 7.5, hy - 7, 8.8, hy - 2, 4, hy - 6, -4, hy - 5.6], spec.hair)); break;
+      case 'messy': hair.push(P([-9.4, hy + 1, -8.5, hy - 7, -3, hy - 11, 2, hy - 9.5, 6, hy - 11, 9.4, hy - 4, 8.8, hy - 1, 4, hy - 6, -3, hy - 5], spec.hair)); break;
+      case 'long': hair.push(P([-9.2, hy + 4, -8.5, hy - 6, 0, hy - 10.4, 8.5, hy - 6, 9.2, hy + 2, 6, hy - 4, -4, hy - 5], spec.hair)); break;
+      case 'bun': hair.push(C(-6.5, hy - 6.5, 4, spec.hair)); hair.push(P([-8.8, hy, -7, hy - 7.5, 0, hy - 9.8, 7.5, hy - 7, 8.6, hy - 1, 3, hy - 5.5, -4, hy - 5], spec.hair)); break;
+      case 'cap': hair.push({ t: 'q', x: 0, y: hy - 2, r: 9.2, col: spec.cap }); hair.push(R(2, hy - 3.2, 11, 3, 1.5, spec.cap)); break;
+      case 'hardhat': hair.push({ t: 'q', x: 0, y: hy - 3, r: 9.6, col: spec.hat }); hair.push(R(-11, hy - 4, 22, 3, 1.5, spec.hat)); break;
+    }
   }
   // scarf / dupatta for Asha
   const scarf = [];
@@ -216,25 +233,35 @@ export function drawFigure(ctx, spec, x, y, opts = {}) {
   run(ctx, all, o);
 
   // face (drawn last, no outline)
-  ctx.fillStyle = INK; ctx.strokeStyle = INK; ctx.lineWidth = 1.2;
-  const blink = Math.sin(t * 0.9 + seed * 5) > 0.985;
-  const ex = 1.8;
-  if (blink) { ctx.fillRect(ex - 4, hy - 0.6, 2.4, 0.9); ctx.fillRect(ex + 1.6, hy - 0.6, 2.4, 0.9); }
-  else { ctx.beginPath(); ctx.arc(ex - 2.8, hy - 0.4, 1.15, 0, 7); ctx.arc(ex + 2.8, hy - 0.4, 1.15, 0, 7); ctx.fill(); }
-  if (spec.glasses) {
-    ctx.lineWidth = 0.9; ctx.beginPath(); ctx.arc(ex - 2.8, hy - 0.4, 2.4, 0, 7); ctx.moveTo(ex + 5.2, hy - 0.4); ctx.arc(ex + 2.8, hy - 0.4, 2.4, 0, 7); ctx.stroke();
-  }
-  ctx.lineWidth = 1.1;
-  const face = opts.face || 'calm';
-  ctx.beginPath();
-  if (face === 'smile') ctx.arc(ex, hy + 2.4, 2.6, 0.15 * Math.PI, 0.85 * Math.PI);
-  else if (face === 'worried') ctx.arc(ex, hy + 5.2, 2.2, 1.2 * Math.PI, 1.8 * Math.PI);
-  else if (face === 'shout' || face === 'open') { ctx.ellipse(ex, hy + 3.6, 1.8, face === 'shout' ? 2.2 : 1.3, 0, 0, 7); ctx.fill(); }
-  else { ctx.moveTo(ex - 1.8, hy + 3.6); ctx.lineTo(ex + 1.8, hy + 3.6); }
-  ctx.stroke();
-  // cheek / brow when worried
-  if (face === 'worried' || face === 'shout') {
-    ctx.beginPath(); ctx.moveTo(ex - 4.5, hy - 3.6); ctx.lineTo(ex - 1.6, hy - 3); ctx.moveTo(ex + 4.5, hy - 3.6); ctx.lineTo(ex + 1.6, hy - 3); ctx.stroke();
+  if (faceImg && faceImg.complete && faceImg.naturalWidth > 0) {
+    const fw = 22 * (spec.s || 1);
+    const fh = (faceImg.naturalHeight / faceImg.naturalWidth) * fw;
+    ctx.save();
+    ctx.shadowColor = 'rgba(24, 32, 58, 0.45)';
+    ctx.shadowBlur = o * 2.5;
+    ctx.drawImage(faceImg, -fw / 2, hy - fh / 2 - 1, fw, fh);
+    ctx.restore();
+  } else if (!faceImg) {
+    ctx.fillStyle = INK; ctx.strokeStyle = INK; ctx.lineWidth = 1.2;
+    const blink = Math.sin(t * 0.9 + seed * 5) > 0.985;
+    const ex = 1.8;
+    if (blink) { ctx.fillRect(ex - 4, hy - 0.6, 2.4, 0.9); ctx.fillRect(ex + 1.6, hy - 0.6, 2.4, 0.9); }
+    else { ctx.beginPath(); ctx.arc(ex - 2.8, hy - 0.4, 1.15, 0, 7); ctx.arc(ex + 2.8, hy - 0.4, 1.15, 0, 7); ctx.fill(); }
+    if (spec.glasses) {
+      ctx.lineWidth = 0.9; ctx.beginPath(); ctx.arc(ex - 2.8, hy - 0.4, 2.4, 0, 7); ctx.moveTo(ex + 5.2, hy - 0.4); ctx.arc(ex + 2.8, hy - 0.4, 2.4, 0, 7); ctx.stroke();
+    }
+    ctx.lineWidth = 1.1;
+    const face = opts.face || 'calm';
+    ctx.beginPath();
+    if (face === 'smile') ctx.arc(ex, hy + 2.4, 2.6, 0.15 * Math.PI, 0.85 * Math.PI);
+    else if (face === 'worried') ctx.arc(ex, hy + 5.2, 2.2, 1.2 * Math.PI, 1.8 * Math.PI);
+    else if (face === 'shout' || face === 'open') { ctx.ellipse(ex, hy + 3.6, 1.8, face === 'shout' ? 2.2 : 1.3, 0, 0, 7); ctx.fill(); }
+    else { ctx.moveTo(ex - 1.8, hy + 3.6); ctx.lineTo(ex + 1.8, hy + 3.6); }
+    ctx.stroke();
+    // cheek / brow when worried
+    if (face === 'worried' || face === 'shout') {
+      ctx.beginPath(); ctx.moveTo(ex - 4.5, hy - 3.6); ctx.lineTo(ex - 1.6, hy - 3); ctx.moveTo(ex + 4.5, hy - 3.6); ctx.lineTo(ex + 1.6, hy - 3); ctx.stroke();
+    }
   }
   // stripes for Aarav
   if (spec.stripe) {
